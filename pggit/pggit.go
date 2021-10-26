@@ -12,14 +12,19 @@ import (
 )
 
 const (
+	fileNameCol = "file_name"
+	keyCol      = "key"
+	versionCol  = "version"
+	dataCol     = "data"
+
 	CreateTableSql = `
 CREATE TABLE IF NOT EXISTS %s
 (
     id serial,
-    file_name character varying(40) COLLATE pg_catalog."default" NOT NULL,
-    key character varying(40) COLLATE pg_catalog."default" NOT NULL,
-    version character varying(500) COLLATE pg_catalog."default" NOT NULL,
-    data bytea,
+    ` + fileNameCol + ` character varying(40) COLLATE pg_catalog."default" NOT NULL,
+    ` + keyCol + ` character varying(40) COLLATE pg_catalog."default" NOT NULL,
+    ` + versionCol + ` character varying(500) COLLATE pg_catalog."default" NOT NULL,
+    ` + dataCol + ` bytea,
     date_create timestamp without time zone NOT NULL DEFAULT now(),
     CONSTRAINT dbfiles_pkey PRIMARY KEY (id),
     CONSTRAINT dbfiles_uxk UNIQUE (file_name, key, version)
@@ -27,14 +32,18 @@ CREATE TABLE IF NOT EXISTS %s
 )
 `
 
-	DeleteVersionSql = `DELETE FROM %s WHERE version = $1`
-	UpdateVersionSql = `UPDATE %s SET version = $1 WHERE version = $2`
+	DeleteBranchSql = `DELETE FROM %s WHERE ` + versionCol + ` = $1`
+	UpdateBranchSql = `UPDATE %s SET ` + versionCol + ` = $1 WHERE ` + versionCol + ` = $2`
+	CopyBranchSql   = `
+	INSERT INTO %s (` + fileNameCol + `, ` + keyCol + `, ` + dataCol + `, ` + versionCol + `)
+	(SELECT ` + fileNameCol + `, ` + keyCol + `, ` + dataCol + `, $1 As ` + versionCol + ` FROM %s WHERE ` + versionCol + ` = $2)
+`
 )
 
 type PgGit struct {
 	plugin plugins.IPlugin
 	db     *sql.DB
-	branch string // current brunch
+	branch string // current branch
 	table  string // schema + table name
 }
 
@@ -59,10 +68,10 @@ func (pgt *PgGit) init() error {
 
 	config := &pgPlug.Config{
 		Table:      pgt.table,
-		FileCol:    "file_name",
-		KeyCol:     "key",
-		ValCol:     "data",
-		VersionCol: "version",
+		FileCol:    fileNameCol,
+		KeyCol:     keyCol,
+		ValCol:     dataCol,
+		VersionCol: versionCol,
 		UseCache:   true,
 		UsePreload: true,
 		Version:    pgt.branch,
@@ -75,10 +84,10 @@ func (pgt *PgGit) init() error {
 func (pgt *PgGit) Config() *pgPlug.Config {
 	return &pgPlug.Config{
 		Table:      pgt.table,
-		FileCol:    "file_name",
-		KeyCol:     "key",
-		ValCol:     "data",
-		VersionCol: "version",
+		FileCol:    fileNameCol,
+		KeyCol:     keyCol,
+		ValCol:     dataCol,
+		VersionCol: versionCol,
 		UseCache:   true,
 		UsePreload: true,
 		Version:    pgt.branch,
@@ -103,9 +112,10 @@ func (pgt *PgGit) SetVersion(branch string) error {
 	return pgt.plugin.SetVersion(branch)
 }
 
-func (pgt *PgGit) MergeTo(ctx context.Context, branch string) error {
-	tmpDel := fmt.Sprintf(DeleteVersionSql, pgt.table)
-	tmpUp := fmt.Sprintf(UpdateVersionSql, pgt.table)
+// MergeToBranch moves all current branch files to incoming branch.
+func (pgt *PgGit) MergeToBranch(ctx context.Context, branch string) error {
+	tmpDel := fmt.Sprintf(DeleteBranchSql, pgt.table)
+	tmpUp := fmt.Sprintf(UpdateBranchSql, pgt.table)
 
 	tx, err := pgt.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
 	if err != nil {
@@ -129,7 +139,37 @@ func (pgt *PgGit) MergeTo(ctx context.Context, branch string) error {
 	return tx.Commit()
 }
 
-func (pgt *PgGit) DeleteVersion(ctx context.Context, branch string) error {
-	_, err := pgt.db.ExecContext(ctx, fmt.Sprintf(DeleteVersionSql, pgt.table), branch)
+// DeleteBranch just cleans brunch's files
+func (pgt *PgGit) DeleteBranch(ctx context.Context, branch string) error {
+	_, err := pgt.db.ExecContext(ctx, fmt.Sprintf(DeleteBranchSql, pgt.table), branch)
 	return err
+}
+
+// ReplaceFromBranch replaces all current branch files from incoming branch.
+func (pgt *PgGit) ReplaceFromBranch(ctx context.Context, branch string) error {
+	tmpDel := fmt.Sprintf(DeleteBranchSql, pgt.table)
+	tmpCopy := fmt.Sprintf(CopyBranchSql, pgt.table, pgt.table)
+
+	tx, err := pgt.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelSerializable})
+	if err != nil {
+		return err
+	}
+
+	// delete files from current branch, if they are exists
+	if _, err = tx.ExecContext(ctx, tmpDel, pgt.branch); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			err = errors.Wrap(err, err.Error())
+		}
+		return err
+	}
+
+	// copy files from incoming branch
+	if _, err = tx.ExecContext(ctx, tmpCopy, pgt.branch, branch); err != nil {
+		if rollbackErr := tx.Rollback(); rollbackErr != nil {
+			err = errors.Wrap(err, err.Error())
+		}
+		return err
+	}
+
+	return tx.Commit()
 }
