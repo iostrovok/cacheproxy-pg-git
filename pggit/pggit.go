@@ -41,17 +41,19 @@ CREATE TABLE IF NOT EXISTS %s
 )
 
 type PgGit struct {
-	plugin plugins.IPlugin
-	db     *sql.DB
-	branch string // current branch
-	table  string // schema + table name
+	plugin   plugins.IPlugin
+	db       *sql.DB
+	branch   string // current branch
+	table    string // schema + table name
+	useCache bool
 }
 
-func New(db *sql.DB, branch, table string) (*PgGit, error) {
+func New(db *sql.DB, branch, table string, useCache bool) (*PgGit, error) {
 	out := &PgGit{
-		db:     db,
-		table:  table,
-		branch: branch,
+		db:       db,
+		table:    table,
+		branch:   branch,
+		useCache: useCache,
 	}
 
 	err := out.init()
@@ -72,8 +74,8 @@ func (pgt *PgGit) init() error {
 		KeyCol:     keyCol,
 		ValCol:     dataCol,
 		VersionCol: versionCol,
-		UseCache:   true,
-		UsePreload: true,
+		UseCache:   pgt.useCache,
+		UsePreload: pgt.useCache,
 		Version:    pgt.branch,
 	}
 
@@ -88,8 +90,8 @@ func (pgt *PgGit) Config() *pgPlug.Config {
 		KeyCol:     keyCol,
 		ValCol:     dataCol,
 		VersionCol: versionCol,
-		UseCache:   true,
-		UsePreload: true,
+		UseCache:   pgt.useCache,
+		UsePreload: pgt.useCache,
 		Version:    pgt.branch,
 	}
 }
