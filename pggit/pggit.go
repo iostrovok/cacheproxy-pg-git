@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS %s
 )
 `
 
-	DeleteBranchKeySql = `DELETE FROM %s WHERE ` + versionCol + ` = $1 AND keyCol ` + ` = $2`
+	DeleteBranchKeySql = `DELETE FROM %s WHERE ` + versionCol + ` = $1 AND ` + keyCol + ` = $2`
 	DeleteBranchSql    = `DELETE FROM %s WHERE ` + versionCol + ` = $1`
 	UpdateBranchSql    = `UPDATE %s SET ` + versionCol + ` = $1 WHERE ` + versionCol + ` = $2`
 	CopyBranchSql      = `
