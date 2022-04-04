@@ -32,9 +32,10 @@ CREATE TABLE IF NOT EXISTS %s
 )
 `
 
-	DeleteBranchSql = `DELETE FROM %s WHERE ` + versionCol + ` = $1`
-	UpdateBranchSql = `UPDATE %s SET ` + versionCol + ` = $1 WHERE ` + versionCol + ` = $2`
-	CopyBranchSql   = `
+	DeleteBranchKeySql = `DELETE FROM %s WHERE ` + versionCol + ` = $1 AND ` + keyCol + ` = $2`
+	DeleteBranchSql    = `DELETE FROM %s WHERE ` + versionCol + ` = $1`
+	UpdateBranchSql    = `UPDATE %s SET ` + versionCol + ` = $1 WHERE ` + versionCol + ` = $2`
+	CopyBranchSql      = `
 	INSERT INTO %s (` + fileNameCol + `, ` + keyCol + `, ` + dataCol + `, ` + versionCol + `)
 	(SELECT ` + fileNameCol + `, ` + keyCol + `, ` + dataCol + `, $1 As ` + versionCol + ` FROM %s WHERE ` + versionCol + ` = $2)
 `
@@ -144,6 +145,12 @@ func (pgt *PgGit) MergeToBranch(ctx context.Context, branch string) error {
 // DeleteBranch just cleans brunch's files
 func (pgt *PgGit) DeleteBranch(ctx context.Context, branch string) error {
 	_, err := pgt.db.ExecContext(ctx, fmt.Sprintf(DeleteBranchSql, pgt.table), branch)
+	return err
+}
+
+// DeleteBranchKey just removes one key from brunch's files
+func (pgt *PgGit) DeleteBranchKey(ctx context.Context, branch, key string) error {
+	_, err := pgt.db.ExecContext(ctx, fmt.Sprintf(DeleteBranchKeySql, pgt.table), branch, key)
 	return err
 }
 
