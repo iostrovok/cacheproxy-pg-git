@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS %s
     ` + versionCol + ` character varying(500) COLLATE pg_catalog."default" NOT NULL,
     ` + dataCol + ` bytea,
     date_create timestamp without time zone NOT NULL DEFAULT now(),
-    CONSTRAINT dbfiles_pkey PRIMARY KEY (id),
-    CONSTRAINT dbfiles_uxk UNIQUE (file_name, key, version)
+    CONSTRAINT %s_pkey PRIMARY KEY (id),
+    CONSTRAINT %s_uxk UNIQUE (file_name, key, version)
         WITH (FILLFACTOR=100)
 )
 `
@@ -63,7 +63,7 @@ func New(db *sql.DB, branch, table string, useCache bool) (*PgGit, error) {
 }
 
 func (pgt *PgGit) init() error {
-	tmp := fmt.Sprintf(CreateTableSql, pgt.table)
+	tmp := fmt.Sprintf(CreateTableSql, pgt.table, pgt.table, pgt.table)
 	_, err := pgt.db.Exec(tmp)
 	if err != nil {
 		return err
