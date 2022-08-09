@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 
@@ -63,7 +64,9 @@ func New(db *sql.DB, branch, table string, useCache bool) (*PgGit, error) {
 }
 
 func (pgt *PgGit) init() error {
-	tmp := fmt.Sprintf(CreateTableSql, pgt.table, pgt.table, pgt.table)
+	// remove schema from name for indexes
+	tableName := strings.Replace(pgt.table, ".", "", -1)
+	tmp := fmt.Sprintf(CreateTableSql, pgt.table, tableName, tableName)
 	_, err := pgt.db.Exec(tmp)
 	if err != nil {
 		return err
