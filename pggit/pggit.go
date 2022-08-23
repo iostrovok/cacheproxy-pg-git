@@ -118,6 +118,11 @@ func (pgt *PgGit) SetVersion(branch string) error {
 	return pgt.plugin.SetVersion(branch)
 }
 
+// PreloadByVersion loads data by 1 request
+func (pgt *PgGit) PreloadByVersion() error {
+	return pgt.plugin.PreloadByVersion()
+}
+
 // MergeToBranch moves all current branch files to incoming branch.
 func (pgt *PgGit) MergeToBranch(ctx context.Context, branch string) error {
 	tmpDel := fmt.Sprintf(DeleteBranchSql, pgt.table)
