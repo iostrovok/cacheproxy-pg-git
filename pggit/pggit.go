@@ -104,6 +104,11 @@ func (pgt *PgGit) Plugin() plugins.IPlugin {
 	return pgt.plugin
 }
 
+// VerboseMode sets up "verbose" mode
+func (pgt *PgGit) VerboseMode(verbose bool) {
+	pgt.plugin.VerboseMode(verbose)
+}
+
 func (pgt *PgGit) Save(file, key string, data []byte) error {
 	return pgt.plugin.Save(file, key, data)
 }
